@@ -1,0 +1,1 @@
+/home/ubuntu/go_viral/examples/train/grpo/qwen2_5_omni_ttcc/sft.sh

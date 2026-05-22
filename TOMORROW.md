@@ -16,7 +16,46 @@ These were raised in today's work but explicitly **deferred** to tomorrow per th
 
 ---
 
-## 2. Reward redesign — bounded saturation problem
+## ~~2. Reward redesign — bounded saturation problem~~ (still open)
+
+Deferred — overshadowed by the lower-$\beta$ fix below, which is the same
+root cause from a different angle.
+
+---
+
+## ~~3. Lower the KL coefficient $\beta$~~ ✓ APPLIED 2026-05-22
+
+Done in `go_viral` commit `8136afe9` — $\beta$ dropped from 0.04 to 0.001
+(DeepSeek-R1 value) across `grpo.sh`, `grpo_extended.sh`, `rloo.sh`,
+`grpo_v2cot_full.sh`, `rloo_v2cot_full.sh`. See `docs/06_config_audit.md`
+for the math (KL gradient was ~16× the reward gradient at $\beta = 0.04$).
+
+---
+
+## ~~4. Larger `num_generations`~~ ✓ APPLIED 2026-05-22
+
+Done in `go_viral` commit `8136afe9` — `num_generations: 2 → 4` across
+all GRPO/RLOO scripts. Cost: ~2× rollout time.
+
+---
+
+## NEW: 2'. Config audit — additional issues found ✓ ALL APPLIED 2026-05-22
+
+`docs/06_config_audit.md` surfaced 5 critical config issues. All applied
+in `go_viral` commit `8136afe9`:
+
+- `FPS_MAX_FRAMES: 24-32 → 60` — was blinding the model for 38% of test
+  ads on the tail
+- `max_completion_length: 384 → 1024` — was 87% clipped during GRPO
+- `--freeze_vit true --freeze_aligner true` — was implicitly attaching
+  LoRA to audio_tower + visual encoder linears (ms-swift default)
+- (β and num_generations: covered above)
+
+The audit doc also flagged 3 diagnostics that remain unverified — see §11.
+
+---
+
+## ORIGINAL 2 (kept for reference): Reward redesign — bounded saturation
 
 **Decision:** swap $r_i = 1 - \text{IBS}_i$ for an unbounded-above variant.
 
@@ -100,7 +139,24 @@ We replaced all three with text-domain SFT + LM-CE + $r = 1 - \text{IBS}$. These
 
 ---
 
-## 9. Engineering hygiene: deduplicate the eval scripts
+## 11. Diagnostics still unverified from the config audit
+
+From `docs/06_config_audit.md` §4:
+
+- **4.1** Verify audio actually contributes gradients in v2 full-FT.
+  `--freeze_aligner true` freezes the audio aligner; need to check
+  whether the LLM still attends to audio embeddings or treats them as
+  fixed features. Check `param.requires_grad` per layer.
+- **4.2** Count ads silently dropped by `--truncation_strategy delete`
+  + `max_length=8192` in v2 full-FT (video tokens at 200704 px × 60
+  frames could push some ads over the limit).
+- **4.3** Confirm vLLM correctly merges LoRA adapters that include
+  audio_tower / visual encoder layers (relevant for the *old* LoRA
+  checkpoints trained before the freeze_vit fix).
+
+---
+
+## 12. Engineering hygiene: deduplicate the eval scripts
 
 **Decision:** decide whether `ttcc-eval/scripts/*.py` should call into `ttcc-eval/src/ttcc_eval/{metrics,bootstrap}.py` instead of reimplementing IBS, BCa, etc. inline.
 

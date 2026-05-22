@@ -15,7 +15,7 @@ VENV="${VENV:-/opt/dlami/nvme/work/swift_venv}"
 TTCC_RL="${TTCC_RL:-/home/ubuntu/ttcc-rl}"
 TMP_JSONL="$(mktemp /tmp/ttcc_infer_XXXX.jsonl)"
 
-CUDA_VISIBLE_DEVICES=0,1 FPS_MAX_FRAMES=24 FPS=1.0 VIDEO_MAX_TOKEN_NUM=4096 \
+CUDA_VISIBLE_DEVICES=0,1 FPS_MAX_FRAMES=60 FPS=1.0 VIDEO_MAX_TOKEN_NUM=8192 \
 "${VENV}/bin/python" -m swift.cli.main infer \
     --model /home/ssm-user/work/hf-cache/Qwen2.5-Omni-3B \
     --adapters "${ADAPTER}" \

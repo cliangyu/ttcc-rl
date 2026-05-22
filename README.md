@@ -83,21 +83,38 @@ ttcc-rl/
 # (0) CoT distillation
 python scripts/cot_distill.py --model INSTRUCT --full --out work-out/cot/full.jsonl
 
-# (1) ms-swift datasets
+# (1) ms-swift datasets (now also builds ttcc_val.jsonl alongside test)
 python scripts/prepare_dataset.py --cot-jsonl work-out/cot/full.jsonl --out-dir data/ttcc_swift
 
-# (2) SFT seed
+# (2) SFT seed — produces multiple checkpoints
 bash go_viral_overlay/examples/train/grpo/qwen2_5_omni_ttcc/sft.sh
 
-# (3) GRPO from SFT
-SFT_CKPT=<sft-ckpt> bash go_viral_overlay/examples/train/grpo/qwen2_5_omni_ttcc/grpo.sh
+# (3) Pick best SFT ckpt on the VAL split (NOT test — that's selection leakage)
+for ckpt in /home/ssm-user/work/work-out/ttcc_sft/v*/checkpoint-*/; do
+    tag="sft_$(basename "$ckpt")"
+    bash scripts/infer_trained.sh "$ckpt" "$tag" \
+        "work-out/preds_${tag}_val.parquet" \
+        data/ttcc_swift/ttcc_val.jsonl       # ← VAL split
+done
+# Eyeball IBS reports, pick best_sft_ckpt.
 
-# (4) Infer + eval (minimal 6-number protocol)
-bash scripts/infer_trained.sh <grpo-ckpt> grpo work-out/preds_grpo.parquet
-python <ttcc-eval>/scripts/minimal_eval.py \
+# (4) GRPO from the best-on-val SFT ckpt
+SFT_CKPT=<best_sft_ckpt> \
+    bash go_viral_overlay/examples/train/grpo/qwen2_5_omni_ttcc/grpo.sh
+
+# (5) Pick best GRPO ckpt on VAL (same loop pattern as step 3)
+
+# (6) ONCE — evaluate the chosen final ckpt on TEST for the headline
+bash scripts/infer_trained.sh <best_grpo_ckpt> grpo work-out/preds_grpo.parquet \
+    data/ttcc_swift/ttcc_test.jsonl
+python ../ttcc-eval/scripts/minimal_eval.py \
     --preds preds_b1.parquet:B1 preds_sft.parquet:SFT preds_grpo.parquet:GRPO \
     --gt data/ttcc_swift/ttcc_test.jsonl --ref B1
 ```
+
+**Critical rule:** never run inference on `ttcc_test.jsonl` until the model has
+been frozen (best checkpoint chosen on val). Otherwise every "X beats Y"
+comparison is biased by test-set tuning.
 
 ## Headline result (n = 87 test ads, 2026-05-20)
 

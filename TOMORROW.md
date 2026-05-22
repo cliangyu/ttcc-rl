@@ -23,6 +23,32 @@ root cause from a different angle.
 
 ---
 
+## ~~1. ttcc-rl repo fate~~ — still open (separate decision)
+
+## ~~Talker / token2wav disable~~ ✓ APPLIED 2026-05-22
+
+Done in `go_viral` commit `cf38f8ae`:
+- `ENABLE_AUDIO_OUTPUT=False` set in `_common.sh` (LoRA round), `sft_v2cot_full.sh`,
+  `infer_v2cot_full.sh`, and `ttcc-rl/scripts/infer_trained.sh`.
+- ms-swift loads thinker-only; frees ~833 M params (~1.5 GB at bf16) per device.
+- Once verified working on the next training run, this should unlock raising
+  `vllm_gpu_memory_utilization` back to 0.35 or letting `num_generations` go to
+  8 within the same memory budget.
+
+## ~~Validation split~~ ✓ DISCOVERED + APPLIED 2026-05-22
+
+Raw TTCC parquets have 3 splits: train (729) / **val (104)** / test (89).
+We previously only built train + test JSONLs. `prepare_dataset.py` now builds
+`ttcc_val.jsonl` too. Workflow updated in README: select on val, evaluate
+ONCE on test.
+
+This **invalidates** the previous "best checkpoint" choices we made on test
+(SFT-Extended ckpt-270, GRPO-Extended ckpt-150). Those were test-set-tuned.
+First task in the next training round: re-run, select on val, report once
+on test.
+
+---
+
 ## ~~3. Lower the KL coefficient $\beta$~~ ✓ APPLIED 2026-05-22
 
 Done in `go_viral` commit `8136afe9` — $\beta$ dropped from 0.04 to 0.001

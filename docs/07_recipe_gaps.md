@@ -19,7 +19,7 @@ Audited against ms-swift `args.json` (authoritative record of what training actu
 
 ## Gaps that probably matter — prioritized
 
-### 1. 🚩 Talker + token2wav are loaded but unused
+### 1. ~~🚩 Talker + token2wav are loaded but unused~~ ✓ FIXED 2026-05-22 (`cf38f8ae`)
 
 **Finding:** `/home/ssm-user/work/hf-cache/Qwen2.5-Omni-3B/config.json` has `enable_talker: True, enable_audio_output: True`. Param breakdown of the full-FT checkpoint we already have:
 
@@ -38,7 +38,19 @@ So **15% of the model (833 M params, ≈ 1.5 GB at bf16) is loaded into GPU memo
 
 **Expected impact:** ~1.5 GB GPU memory saved per device → we can raise `vllm_gpu_memory_utilization` back to 0.35-0.40 (more rollout budget), possibly fit larger `num_generations`, possibly use larger frame budgets.
 
-### 2. 🚩 No validation set — we've been doing model selection on the test set
+### 2. ~~🚩 No validation set~~ ✓ DISCOVERED + FIXED 2026-05-22 (`cf38f8ae`)
+
+**Update:** the HF dataset *does* have a val split (104 ads); we just weren't
+building a JSONL for it. `prepare_dataset.py` now writes `ttcc_val.jsonl` too.
+Workflow in README updated: select checkpoints on val, evaluate ONCE on test.
+The previous "best ckpt" choices (SFT-Ext-270, GRPO-Ext-150) were test-tuned
+and are invalidated for use in any publication-grade comparison.
+
+---
+
+### Original §2 below (kept for context; superseded by the discovery above)
+
+### 2'. 🚩 No validation set — we've been doing model selection on the test set
 
 **Finding:** we have only `ttcc_train_sft.jsonl` (717) and `ttcc_test.jsonl` (87). No `ttcc_val.jsonl`.
 

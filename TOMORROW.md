@@ -1,6 +1,65 @@
 # Open decisions — surface for next session
 
-These were raised in today's work but explicitly **deferred** to tomorrow per the user's instruction. Each entry: the decision, the evidence, the recommendation, the cost.
+These were raised across the multi-day session and explicitly **deferred** per the user's instruction. Each entry: the decision, the evidence, the recommendation, the cost.
+
+> **Reading order**: items under "NEW 2026-05-22 afternoon" first (most recent findings), then the older items below (some are already done — marked with strikethrough).
+
+---
+
+## NEW 2026-05-22 afternoon — added after v38 + H1 + config sweep
+
+### A. v38 mode collapse is real — what to do about it
+
+**Decision:** the full-FT noCoT overfit (v38) memorized digit tokens but produces **content-blind** retention curves (R[1] correlation with GT ≈ 0; std-across-ads ≈ 0.04; per-ad MSE ties B1 train-mean baseline). Full diagnostic in `docs/09_session_journal_20260522_afternoon.md`.
+
+**Recommendation:** the prior project audit (`docs/04_final_report.md` §8) already established that CoT vs noCoT changes format adherence (87/87 vs 66/87 parse) but not numeric quality — and that **GRPO is the only method with non-trivial across-ad ranking signal** (Spearman +0.217 on hook strength, Q2+Q3 paired BCa CI excludes 0). So the path is: SFT (CoT, audit-ambitious recipe, full 717+101) → GRPO (with curve-quality reward) from best-val ckpt. Don't expect SFT alone to break collapse no matter how much data or how long we train.
+
+**Cost:** the SFT + GRPO sequence is ~12-20h + ~3-4h on our hardware (per the config sweep estimates below). Worth running.
+
+### B. Config sweep in progress — T1b just running (Liger fused CE)
+
+**Decision:** decide the fastest training config that fits FPS=1 + FPS_MAX_FRAMES=60 + max_pixels=200704 + max_length=24576 on 2× Blackwell sm_120.
+
+**Status:**
+- B0 baseline measured: **211 s/step, 77 GiB peak** (zero3, FA2, vit_ckpt on, bs=1 ga=8, lazy_tokenize)
+- T1a (FA3 from windreamer wheel): **DEAD** — wheel only ships sm_80 + sm_90a kernels, incompatible with sm_120 Blackwell
+- T1b (--use_liger_kernel true): running at time of writing
+- T1c (ZeRO-2 instead of ZeRO-3), T2a (vit_ckpt off), T2b (bs=2): pending, gated on memory headroom from T1b
+- T3a (torch.compile): optional additive
+
+Full sweep tree + rationale in `docs/09_session_journal_20260522_afternoon.md` §Training-config sweep.
+
+### C. Test SFT-CoT at full-FT scale (audit doc never did)
+
+**Decision:** prior audit found "CoT only helps format adherence, not numeric quality" — but that was **LoRA-SFT at 1-3 epochs**. Full-FT at 10+ epochs with audit-ambitious recipe + the new v3 Gemini-distilled CoTs may differ. Worth one apples-to-apples comparison once the config sweep commits a config.
+
+**Cost:** 1× full-FT run with v2cot/ttcc_train_sft.jsonl (CoT) + 1× with v2cot_nocot (no CoT) — ~12-20h each. Or just CoT and trust the audit verdict for noCoT.
+
+### D. ckpt-50 is the GRPO init candidate, not ckpt-80
+
+**Decision:** v38 ckpt-50 (best val CE) had marginally lower curve-MSE on val (0.0075 vs 0.0082) and slightly less mode collapse (std 0.040 vs 0.045). Use ckpt-50 as the GRPO init when we run H3. **But the larger issue is that v38 was on filtered 116 — we want a v38-like overfit-then-RL sequence from the full 717-row SFT (H2's output).**
+
+### E. Aligner-unfreeze experiment
+
+**Decision:** currently `freeze_aligner=true`. The aligner projects visual+audio embeddings into the LLM's input space. If the projection is the bottleneck (frozen aligner → LLM can't differentiate ads), unfreezing could help break mode collapse without needing GRPO. Cheap to try.
+
+**Cost:** one config flag flip + retraining run. ~12-20h.
+
+### F. Housekeeping ✓ APPLIED 2026-05-22 afternoon
+
+- Repo now organized: `scripts/{bench,infer,analysis,data,diagnostic,overnight,utility,viz}/`, `runs/{v38_inference,config_sweep,old_session_archive}/`, `patches/`
+- `RUNBOOK.md` added at root
+- `swift/dataset/utils.py` n_try_fetch=30 patch captured in `patches/swift_n_try_fetch_30.patch`
+- `/tmp` cleaned (was 5.2 GB → 59 MB; remaining 59 MB is the live bench_B0.log + not-mine logs)
+- `feedback_make_it_right_first_time.md` added to auto-memory
+
+### G. Stale: TOMORROW.md item 1 says "no .git/ directory"
+
+`ttcc-rl/.git` now exists with 5 commits (most recent: `dff6c5e infer: support val split via optional 4th arg + disable Talker`). Repo decision (push as 4th remote vs keep local) is still open — but the premise of item 1 has changed.
+
+---
+
+## OLDER ITEMS BELOW (some applied, some still open)
 
 ---
 

@@ -6,3 +6,6 @@ __pycache__/
 build/
 dist/
 .venv/
+
+# Run outputs (predictions, plots, logs, archives) — too large for git
+runs/

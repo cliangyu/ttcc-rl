@@ -1,0 +1,23 @@
+# Local patch: raise n_try_fetch from 10 to 30 in ms-swift dataset retry loop
+#
+# Background: swift/dataset/utils.py:__getitem__ catches all per-row tokenization
+# failures and retries n_try_fetch times before raising a generic "increase
+# max_length" error. With max_length tight and FPS_MAX_FRAMES=60, the original 10
+# is too low — a few consecutive bad rows aborts training. Raising to 30 gives
+# better resilience without masking real issues (the retry loop itself is the
+# correct mechanism; the cap is just too tight).
+#
+# Apply with: cd /home/ubuntu/go_viral && git apply /home/ubuntu/ttcc-rl/patches/swift_n_try_fetch_30.patch
+# (Or sed -i if not in a git tree.)
+
+--- a/swift/dataset/utils.py
++++ b/swift/dataset/utils.py
+@@ -61,7 +61,7 @@
+                  template=None,
+                  *,
+                  num_proc: int = 1,
+-                 n_try_fetch: int = 10,
++                 n_try_fetch: int = 30,
+                  strict: bool = False,
+                  random_state=None,
+                  traceback_limit: int = 10,
